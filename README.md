@@ -6,9 +6,11 @@
 
 > 平台中立：遵循 Agent Skills 开放标准（frontmatter: `name`/`description`），目录约定 `.agent/memory/` 跨平台一致，可在支持 SKILL.md 的 agent（Claude Code、Codex、OpenClaw、Hermes 等）加载。
 >
+> **本 skill 本体（SKILL.md、`.agent/memory/` 约定、LOAD/PERSIST 流程、触发词）跨平台通用，不绑定任何特定 agent**。
+>
 > **范围标记**（全文通用）：
 > - 🟢 **跨平台通用** — 所有支持 SKILL.md 的 agent 均生效
-> - 🔴 **Claude Code 专属** — 仅 Claude Code 提供对应机制，其他平台按各自等价机制处理
+> - 🔴 **Claude Code 提供**（可选增强）— 仅 Claude Code 有该机制；**非 skill 必需**，不配置不影响核心功能，其他平台按各自等价机制处理
 
 ---
 
@@ -17,7 +19,7 @@
 1. [安装方式](#安装方式)
 2. [使用方式（完整流程）](#使用方式完整流程)
 3. [触发词列表](#触发词列表)
-4. [Claude Code 专属 vs 跨平台通用](#claude-code-专属-vs-跨平台通用)
+4. [平台能力对照](#平台能力对照)
 5. [文件结构](#文件结构)
 
 ---
@@ -47,7 +49,9 @@ cp -r conversation-accuracy-skill ~/.hermes/skills/
 
 > 💡 **单一事实源**：若同一台机器上多个 agent 都要用，建议采用 **symlink**——源目录放一处（如 `~/.agents/skills/`），各平台 skills 目录用软链接指向源，改源即同步到所有消费者，避免多份拷贝漂移。
 
-### 🔴 方式二：Plugin marketplace 安装（仅 Claude Code）
+### 🔴 方式二：Plugin marketplace 安装（Claude Code 专用渠道，可选）
+
+> 本方式仅面向 Claude Code 用户，是 Claude Code 的**额外安装渠道**；skill 本体不依赖它。不用 plugin、直接走方式一，功能完全一致。
 
 Claude Code 支持 plugin 机制：一个 marketplace 是一个 git 仓库，内含 `.claude-plugin/marketplace.json`（插件清单）+ 各插件目录（`plugin.json` + `skills/`）。
 
@@ -61,11 +65,11 @@ claude plugin marketplace add <marketplace-url>
 claude plugin install <marketplace>@conversation-accuracy-skill
 ```
 
-> ⚠️ 本仓库当前为**纯 skill 仓库**（未含 `.claude-plugin/` 结构）。若要走 marketplace 路径，需先按 [Claude Code Plugin 规范](https://docs.anthropic.com/en/docs/claude-code/plugins) 包装。日常直接使用请用方式一。
+> ⚠️ 本仓库当前为**纯 skill 仓库**（未含 `.claude-plugin/` 结构）。若要走 marketplace 路径，需先按 [Claude Code Plugin 规范](https://docs.anthropic.com/en/docs/claude-code/plugins) 包装。日常直接使用请用方式一（跨平台）。
 
-### 🔴 可选增强：hook 自动注入（仅 Claude Code）
+### 🔴 可选增强：hook 自动注入（Claude Code 自动化，非必需）
 
-Claude Code 可配置 hook 实现「会话开始自动注入 ACTIVE_CONTEXT.md」与「编辑后自动校验」，无需手动加载：
+Claude Code 可配置 hook 实现「会话开始自动注入 ACTIVE_CONTEXT.md」与「编辑后自动校验」，无需手动加载。**这是纯自动化增强——不配置 hook 也能在 Claude Code 正常使用本 skill（手动触发 LOAD/PERSIST），其他平台同理：**
 
 ```jsonc
 // settings.local.json（机器级，建议放 local 层避免被 provider 切换重写）
@@ -78,7 +82,7 @@ Claude Code 可配置 hook 实现「会话开始自动注入 ACTIVE_CONTEXT.md�
 }
 ```
 
-> 🔴 hook 机制仅 Claude Code 提供。其他平台按其各自的启动加载机制处理（如 Codex 的启动钩子、OpenClaw 的插件生命周期），`SKILL.md` 核心流程不变。
+> 🔴 hook 机制仅 Claude Code 提供，且仅为可选自动化。其他平台按其各自的启动加载机制处理（如 Codex 的启动钩子、OpenClaw 的插件生命周期），`SKILL.md` 核心流程不变。
 
 ---
 
@@ -98,7 +102,7 @@ Claude Code 可配置 hook 实现「会话开始自动注入 ACTIVE_CONTEXT.md�
 3. 按 `memory-templates.md` 模板创建 4 个初始文件：`ACTIVE_CONTEXT.md` / `session-summary.md` / `todo-tracker.md` / `user-preferences.md`
 
 > 🟢 目录约定 `.agent/memory/` 跨平台一致，4 个文件结构通用。
-> 🔴 仅当项目安装了 OpenViking 插件时，`user-preferences.md` 才包含「Session History Storage」双记忆系统章节；否则省略。
+> ⚪ 可选：仅当项目安装了 OpenViking 插件时，`user-preferences.md` 才包含「Session History Storage」双记忆系统章节；否则省略（与 agent 平台无关）。
 > 🟢 兼容旧项目：目录缺失时回退读取遗留的 `.claude/memory/`（已废弃目录，仅历史包袱项目存在）——**读取支持回退，写入一律 `.agent/memory/`**，读到旧目录会提示迁移。
 
 ### 第 2 步：启动 / 续接会话（LOAD 加载记忆）
@@ -111,8 +115,8 @@ Claude Code 可配置 hook 实现「会话开始自动注入 ACTIVE_CONTEXT.md�
 4. 仅当用户偏好影响当前实现 → 读 `user-preferences.md`
 5. **核对**用户声称的历史事实与记忆是否一致；不一致先指出差异再继续
 
-> 🔴 Claude Code 若配置了 SessionStart hook，`ACTIVE_CONTEXT.md` 会**自动注入**，无需手动要求恢复，也不再询问「是否恢复」。
-> 🟢 其他平台：向 Agent 说「继续上次的工作」等触发语即可，Agent 按上述步骤加载。
+> 🔴 Claude Code 若配置了 SessionStart hook（可选增强），`ACTIVE_CONTEXT.md` 会**自动注入**，无需手动要求恢复，也不再询问「是否恢复」；未配置则与其他平台一致，手动触发即可。
+> 🟢 所有平台（含 Claude Code）：向 Agent 说「继续上次的工作」等触发语即可，Agent 按上述步骤加载。
 
 ### 第 3 步：工作中保存（PERSIST 保存上下文）
 
@@ -133,7 +137,7 @@ Claude Code 可配置 hook 实现「会话开始自动注入 ACTIVE_CONTEXT.md�
 | < 60% | 正常运行，定期持久化 |
 | 60–80% | PERSIST → 继续工作，建议压缩上下文 |
 | ≥ 80% | 已持久化则继续；未持久化立即 PERSIST |
-| ≥ 100% | 🔴 上下文压缩触发（各平台机制不同），从项目记忆自动恢复 |
+| ≥ 100% | 上下文压缩触发（🟢 各平台均有，机制不同），从项目记忆自动恢复 |
 
 ### 第 4 步：跨会话恢复（再次启动）
 
@@ -178,7 +182,9 @@ Claude Code 可配置 hook 实现「会话开始自动注入 ACTIVE_CONTEXT.md�
 
 ---
 
-## Claude Code 专属 vs 跨平台通用
+## 平台能力对照
+
+> skill 本体全部能力（`SKILL.md` 核心 + `.agent/memory/` 约定 + 流程 + 触发词）**跨平台一致**。以下仅列出因平台而异的**可选增强/渠道**——均非 skill 必需。
 
 | 能力 | 范围 | 说明 |
 |:---|:---|:---|
@@ -188,10 +194,10 @@ Claude Code 可配置 hook 实现「会话开始自动注入 ACTIVE_CONTEXT.md�
 | 触发词（人类语言） | 🟢 跨平台 | 与平台无关 |
 | 遗留 `.claude/memory/` 回退兼容 | 🟢 跨平台 | 旧项目仅回退读取，写入一律新目录 |
 | 上下文占用临界值（60/80/100%） | 🟢 跨平台 | 通用经验值，各平台按其机制处理 |
-| SessionStart 自动注入 ACTIVE_CONTEXT | 🔴 Claude Code | 其他平台按各自启动加载机制 |
-| auto-compact 自动上下文压缩 | 🔴 Claude Code | 其他平台各自的等价压缩机制 |
-| Plugin marketplace 安装 | 🔴 Claude Code | `claude plugin install` |
-| hook（session-start / post-edit-tsc） | 🔴 Claude Code | settings.local.json 注册，机器级 |
+| SessionStart 自动注入 ACTIVE_CONTEXT | 🔴 Claude Code 提供 | 可选增强；其他平台按各自启动加载机制 |
+| auto-compact 自动上下文压缩 | 🔴 Claude Code 提供 | 可选增强；其他平台各自的等价压缩机制 |
+| Plugin marketplace 安装 | 🔴 Claude Code 提供 | 可选安装渠道；`claude plugin install` |
+| hook（session-start / post-edit-tsc） | 🔴 Claude Code 提供 | 可选增强；settings.local.json 注册，机器级 |
 | Session History Storage（OpenViking 集成） | 可选 | 仅项目安装 openviking 插件时启用 |
 
 ---
@@ -203,7 +209,8 @@ conversation-accuracy-skill/
 ├── SKILL.md               # 技能主文件（模式判定 / LOAD / PERSIST / 决策表 / 异常 fallback）
 ├── memory-templates.md    # 四文件模板 + 质量自查
 ├── test-prompts.json      # 评测集（LOAD / PERSIST / 初始化 / 回退 6 场景）
-└── README.md              # 本文档
+├── README.md              # 本文档
+└── LICENSE                # MIT License（Copyright 2026 cnyet）
 ```
 
 技能运行时的记忆目录（在**使用技能的项目**里，非本仓库）：
