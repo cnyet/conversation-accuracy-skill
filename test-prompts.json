@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "prompt": "咱们继续昨天讨论的那个方案，我记得已经决定用 A 方向了，你先看看之前的记录再接着做。",
+    "expected": "应该先检查 .agent/memory/ 是否存在 → 读取 ACTIVE_CONTEXT.md + todo-tracker.md → 确认「A 方向」这个决策是否在 session-summary.md 中 → 不要盲目相信用户说的「已决定」，而是从记忆文件核对 → 然后继续任务",
+    "scenario": "跨会话续接（happy path）"
+  },
+  {
+    "id": 2,
+    "prompt": "我们已经聊了 20 多轮了，重点开始有点漂移，你先把关键决策整理一下再继续。",
+    "expected": "应该识别 Ctx 已高 → 主动持久化到 session-summary.md（追加模式，不覆盖）+ 更新 ACTIVE_CONTEXT.md 为当前态 → 用结构化摘要（决策/事实/待办）而非对话流水账 → 明确告知用户「上下文已保存」→ 不阻塞任务，继续工作",
+    "scenario": "长会话中期压缩"
+  },
+  {
+    "id": 3,
+    "prompt": "这个新项目还没建过记忆目录，你先帮我把上下文管理规范建立起来，以后我们就按这个来。",
+    "expected": "应该先运行 `mkdir -p .agent/memory/archive` → 按模板创建 4 个初始文件（ACTIVE_CONTEXT.md、session-summary.md、todo-tracker.md、user-preferences.md）→ 若安装 openviking 插件则 user-preferences.md 包含「Session History Storage」章节，否则省略 → 不要一上来就加载不存在的历史",
+    "scenario": "新项目初始化（边界）"
+  },
+  {
+    "id": 4,
+    "prompt": "上次我们定的不是 B 方向吗？我记得改 B 了，你直接按 B 继续写吧。",
+    "expected": "应该核对记忆文件里的实际决策，不要盲从用户声称的「B」→ 若记录是 A 则指出差异并请用户确认 → 再按确认后的方向继续",
+    "scenario": "记忆与用户说法矛盾（负例）"
+  },
+  {
+    "id": 5,
+    "prompt": "别管以前那些记录了，直接开始写新功能，不用看历史。",
+    "expected": "用户明确不加载 → 跳过历史加载，直接开新任务 → 不强制读 ACTIVE_CONTEXT/session-summary，仅在任务需要时才按需读取",
+    "scenario": "用户明确不要历史（负例）"
+  },
+  {
+    "id": 6,
+    "prompt": "这个老项目没建过 .agent/memory/，但之前应该有历史记录，你找找看恢复一下。",
+    "expected": "先查 .agent/memory/ → 不存在则回退查找遗留 .claude/memory/ → 找到则读取其中的 ACTIVE_CONTEXT.md 等恢复上下文 → 提示用户可迁移到 .agent/memory/ → 不写入旧目录、绝不新建 .claude/memory/",
+    "scenario": "遗留 .claude/memory/ 回退（历史包袱）"
+  }
+]
